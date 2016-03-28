@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans 
+		http://www.springframework.org/schema/beans/spring-beans.xsd 
+		http://www.springframework.org/schema/tx 
+		http://www.springframework.org/schema/tx/spring-tx.xsd 
+		http://www.springframework.org/schema/context 
+		http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop.xsd"
+	default-lazy-init="false">
+	
+	<!-- 扫描的包路径 没有使用MVC不需要过滤 -->
+	<context:component-scan base-package="cn.timgise">
+		<context:exclude-filter type="annotation"
+			expression="org.springframework.stereotype.Controller" />
+	</context:component-scan>
+	
+	<!-- 加载*.properties File -->
+	<bean id="dbConfPostProcessor"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:jdbc.properties</value>
+			</list>
+		</property>
+	</bean>
+	
+	<bean id="stat-filter" class="com.alibaba.druid.filter.stat.StatFilter">
+		<property name="slowSqlMillis" value="3000" />
+		<property name="logSlowSql" value="true" />
+	</bean>
+	
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		destroy-method="close">
+		<property name="driverClassName">
+			<value>${db.springrain.driver}</value>
+		</property>
+		<property name="url">
+			<value>${db.springrain.url}</value>
+		</property>
+		<property name="username">
+			<value>${db.springrain.username}</value>
+		</property>
+		<property name="password">
+			<value>${db.springrain.password}</value>
+		</property>
+		<property name="proxyFilters">
+			<list>
+				<ref bean="stat-filter" />
+			</list>
+		</property>
+		<property name="maxActive">
+			<value>50</value>
+		</property>
+		<property name="initialSize">
+			<value>5</value>
+		</property>
+		<property name="maxWait">
+			<value>60000</value>
+		</property>
+		<property name="minIdle">
+			<value>5</value>
+		</property>
+		<property name="removeAbandoned">
+			<value>true</value>
+		</property>
+		<!-- 关闭abanded连接时输出错误日志 -->
+		<property name="logAbandoned" value="true" />
+		<property name="removeAbandonedTimeout">
+			<value>1800</value>
+		</property>
+		<property name="testWhileIdle">
+			<value>true</value>
+		</property> <!-- 打开检查,用异步线程evict进行检查 -->
+		<property name="testOnBorrow">
+			<value>true</value>
+		</property>
+		<property name="testOnReturn">
+			<value>false</value>
+		</property>
+		<property name="validationQuery">
+			<value>select 1 </value>
+		</property>
+		<property name="minEvictableIdleTimeMillis">
+			<value>300000</value>
+		</property>
+		<property name="timeBetweenEvictionRunsMillis">
+			<value>60000</value>
+		</property>
+		<property name="numTestsPerEvictionRun">
+			<value>50</value>
+		</property>
+	</bean>
+
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+
+	<!-- 基本事务定义,使用transactionManager作事务管理,默认find*方法的事务为readonly -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<!-- 指定哪些方法需要加入事务，可以使用通配符来只加入需要的方法 -->
+			<tx:method name="save*" propagation="REQUIRED" isolation="READ_UNCOMMITTED"
+				timeout="36000" rollback-for="Exception" />
+			<tx:method name="add*" propagation="REQUIRED" isolation="READ_UNCOMMITTED"
+				timeout="36000" rollback-for="Exception" />
+			<tx:method name="update*" propagation="REQUIRED" isolation="READ_UNCOMMITTED"
+				timeout="36000" rollback-for="Exception" />
+			<tx:method name="delete*" propagation="REQUIRED" isolation="READ_UNCOMMITTED"
+				timeout="36000" rollback-for="Exception" />
+			<tx:method name="create*" read-only="true" isolation="READ_UNCOMMITTED"
+				timeout="36000" />
+		</tx:attributes>
+	</tx:advice>
+
+	<aop:config>
+		<!-- 切面事务操作 -->
+		<aop:pointcut id="servicePointcut" expression="execution(* cn.timgise.*Service.*(..))" />
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="servicePointcut" />
+	</aop:config>
+	
+	
+	<!-- Mybatis Spring SqlSessionFactoryBean -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+  		<property name="dataSource" ref="dataSource" />
+  		<property name="typeAliasesPackage" value="cn.timgise.domain" />
+  		<!-- <property name="configLocation" value="classpath*:mybatis/mybatis-config.xml"/>
+  		<property name="mapperLocations" value="classpath*:mybatis/mappers/**/*.xml" />
+ 		-->
+ 	</bean>
+	
+	<!-- <bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+  		<constructor-arg index="0" ref="sqlSessionFactory" />
+  		<constructor-arg index="1" value="BATCH" />
+	</bean> -->
+	<!-- 注册器查找配置 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+  		<property name="basePackage" value="cn.timgise.persistence" />
+  		<!-- 当你使用一个以上的数据源时配置该属性 -->
+  		<!-- <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" /> -->
+	</bean>
+
+</beans>
